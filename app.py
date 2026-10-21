@@ -92,8 +92,6 @@ def index():
 
 @app.route('/admin')
 def admin_page():
-    if session.get('role') != 'admin':
-        return redirect('/?auth=admin_required')
     return render_template('admin.html')
 
 # ─── GOOGLE AI STUDIO (GEMINI) ENDPOINTS ─────────────────────────
