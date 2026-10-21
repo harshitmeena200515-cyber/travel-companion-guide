@@ -201,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateUI(weatherInfo, places, seasonalData, cityInfo, countryInfo) {
         // Update Weather
+        window.currentCity = weatherInfo.city;
+        if (window.loadHotelDeals) {
+            window.loadHotelDeals(weatherInfo.city);
+        }
         cityNameEl.textContent = `${weatherInfo.city}, ${weatherInfo.country}`;
         placesCityNameEl.textContent = weatherInfo.city;
         
@@ -466,3 +470,112 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ─── GOOGLE AI STUDIO (GEMINI) & HOTEL DEALS EXTENSIONS ─────────
+
+window.loadHotelDeals = async function(city) {
+    const grid = document.getElementById('hotelDealsGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div style="color: #94a3b8; font-size: 0.9rem; padding: 10px;">Finding best hotel deals for ' + city + '...</div>';
+    try {
+        const res = await fetch('/api/hotels/affiliates?city=' + encodeURIComponent(city));
+        const data = await res.json();
+        if (data.deals && data.deals.length) {
+            grid.innerHTML = data.deals.map(d => `
+                <div style="background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 800; color: ${d.color}; font-size: 1.05rem;">${d.partner}</span>
+                            <span style="font-size: 0.75rem; background: rgba(255,255,255,0.08); padding: 3px 8px; border-radius: 6px; color: #38bdf8;">${d.badge}</span>
+                        </div>
+                        <h4 style="font-size: 0.95rem; margin-bottom: 6px; color: #f8fafc;">${d.title}</h4>
+                        <p style="font-size: 0.85rem; color: #34d399; font-weight: 600; margin-bottom: 14px;">🏷️ ${d.discount}</p>
+                    </div>
+                    <a href="${d.url}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: ${d.color}; color: #fff; text-decoration: none; padding: 9px 14px; border-radius: 8px; font-size: 0.88rem; font-weight: 600;">
+                        <span>Check Availability</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        grid.innerHTML = '<div style="color: #94a3b8;">Hotel deals currently updating.</div>';
+    }
+};
+
+window.generateAiPlan = async function() {
+    const city = window.currentCity || (document.getElementById('cityInput') ? document.getElementById('cityInput').value.trim() : '');
+    if (!city) {
+        alert('कृपया पहले किसी शहर का नाम लिखकर Search करें!');
+        return;
+    }
+    const days = document.getElementById('aiDaysSelect') ? document.getElementById('aiDaysSelect').value : 3;
+    const budget = document.getElementById('aiBudgetSelect') ? document.getElementById('aiBudgetSelect').value : 'Moderate';
+    const travel_type = document.getElementById('aiGroupSelect') ? document.getElementById('aiGroupSelect').value : 'Friends';
+
+    const loading = document.getElementById('aiPlanLoading');
+    const resultBox = document.getElementById('aiPlanResult');
+    const printBtn = document.getElementById('printPlanBtn');
+
+    loading.style.display = 'block';
+    resultBox.style.display = 'none';
+
+    try {
+        const res = await fetch('/api/ai/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ city, days: parseInt(days), budget, travel_type })
+        });
+        const data = await res.json();
+        loading.style.display = 'none';
+        if (data.itinerary) {
+            resultBox.innerHTML = formatMarkdown(data.itinerary);
+            resultBox.style.display = 'block';
+            if (printBtn) printBtn.style.display = 'inline-flex';
+        } else {
+            resultBox.innerHTML = '<p style="color: #f87171;">' + (data.error || 'Failed to generate itinerary') + '</p>';
+            resultBox.style.display = 'block';
+        }
+    } catch (e) {
+        loading.style.display = 'none';
+        resultBox.innerHTML = '<p style="color: #f87171;">Error generating itinerary. Please try again.</p>';
+        resultBox.style.display = 'block';
+    }
+};
+
+window.printItinerary = function() {
+    const content = document.getElementById('aiPlanResult').innerHTML;
+    const city = window.currentCity || 'Trip';
+    const win = window.open('', '_blank');
+    win.document.write(`
+        <html>
+        <head>
+            <title>${city} - AI Travel Itinerary</title>
+            <style>
+                body { font-family: sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+                h1, h2, h3 { color: #0f172a; }
+                strong { color: #3b82f6; }
+            </style>
+        </head>
+        <body>
+            <h1>🌍 Travele — ${city} Smart Itinerary</h1>
+            <p>Generated by Google AI Studio (Gemini 3.8 Flash)</p>
+            <hr style="margin: 20px 0;">
+            ${content}
+            <script>window.print();</script>
+        </body>
+        </html>
+    `);
+    win.document.close();
+};
+
+function formatMarkdown(text) {
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^### (.*$)/gim, '<h4 style="color:#818cf8; margin-top:16px; margin-bottom:8px;">$1</h4>')
+        .replace(/^## (.*$)/gim, '<h3 style="color:#38bdf8; margin-top:20px; margin-bottom:10px;">$1</h3>')
+        .replace(/^# (.*$)/gim, '<h2 style="color:#f8fafc; margin-top:24px; margin-bottom:12px;">$1</h2>')
+        .replace(/^\s*\n\*/gm, '<br>• ')
+        .replace(/\n/g, '<br>');
+}

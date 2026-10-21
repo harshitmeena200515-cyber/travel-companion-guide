@@ -16,6 +16,45 @@ WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 # Wikipedia API
 WIKI_URL = "https://en.wikipedia.org/w/api.php"
 
+def get_gemini_key():
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        env_file = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_file):
+            with open(env_file, encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith("GEMINI_API_KEY="):
+                        key = line.strip().split("=", 1)[1]
+    return key
+
+def call_gemini(prompt, system_instruction=None):
+    key = get_gemini_key()
+    if not key:
+        return "⚠️ Google AI Studio GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your environment or .env file."
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={key}"
+    payload = {
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ]
+    }
+    if system_instruction:
+        payload["systemInstruction"] = {
+            "parts": [{"text": system_instruction}]
+        }
+        
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return f"AI Studio Error ({resp.status_code}): {resp.text}"
+    except Exception as e:
+        return f"Network Exception: {str(e)}"
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -38,7 +77,6 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
-    # Create Default Admin Account if not exists
     c.execute("SELECT id FROM users WHERE username = 'admin'")
     if not c.fetchone():
         admin_pwd = generate_password_hash("HarshitTravelAdmin2026!")
@@ -46,7 +84,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize database tables on startup
 init_db()
 
 @app.route('/')
@@ -58,6 +95,91 @@ def admin_page():
     if session.get('role') != 'admin':
         return redirect('/?auth=admin_required')
     return render_template('admin.html')
+
+# ─── GOOGLE AI STUDIO (GEMINI) ENDPOINTS ─────────────────────────
+
+@app.route('/api/ai/plan', methods=['POST'])
+def ai_plan():
+    data = request.get_json() or {}
+    city = data.get('city', '').strip()
+    days = data.get('days', 3)
+    budget = data.get('budget', 'Moderate (₹₹)')
+    travel_type = data.get('travel_type', 'Friends / Solo')
+    language = data.get('language', 'Hindi & English (Hinglish)')
+
+    if not city:
+        return jsonify({"error": "City name is required"}), 400
+
+    prompt = f"""
+    Create a detailed, exciting, and realistic {days}-day travel itinerary for {city}.
+    - Target Audience/Style: {travel_type}
+    - Budget Category: {budget}
+    - Language: {language}
+
+    Structure the response clearly with:
+    1. 🌟 Trip Overview & Highlights
+    2. 📅 Day-by-Day Breakdown (Day 1, Day 2, etc.) with Morning, Afternoon, Evening schedule & approximate entry tickets/costs in INR (₹).
+    3. 🍲 Best Local Street Food & Must-Try Dishes (with top area/market suggestions).
+    4. 💡 Insider Hacks (Best local transport/Metro vs Auto, best sunset point, photo spot).
+    5. 💰 Estimated Total Budget Breakdown (Stay, Food, Sightseeing, Transport).
+
+    Keep the tone friendly, practical, and highly engaging.
+    """
+    system_instruction = "You are an elite travel architect and local cultural connoisseur with deep knowledge of Indian and global travel logistics, budgets, safety, and cuisine."
+    
+    plan_text = call_gemini(prompt, system_instruction)
+    return jsonify({
+        "city": city,
+        "days": days,
+        "itinerary": plan_text
+    })
+
+@app.route('/api/ai/ask', methods=['POST'])
+def ai_ask():
+    data = request.get_json() or {}
+    city = data.get('city', '').strip()
+    question = data.get('question', '').strip()
+
+    if not question:
+        return jsonify({"error": "Question is required"}), 400
+
+    prompt = f"Regarding traveling to or exploring {city}: {question}. Provide an accurate, helpful, friendly answer with practical tips."
+    reply = call_gemini(prompt, "You are Travele's instant AI travel assistant. Answer helpfully, accurately, and concisely.")
+    return jsonify({"reply": reply})
+
+@app.route('/api/hotels/affiliates', methods=['GET'])
+def get_hotel_affiliates():
+    city = request.args.get('city', '').strip()
+    if not city:
+        return jsonify({"deals": []})
+
+    deals = [
+        {
+            "partner": "Booking.com",
+            "title": f"Top Rated Hotels & Stays in {city}",
+            "discount": "Up to 30% Off Deals",
+            "url": f"https://www.booking.com/searchresults.html?ss={requests.utils.quote(city)}",
+            "badge": "Best Price Guarantee",
+            "color": "#003580"
+        },
+        {
+            "partner": "MakeMyTrip",
+            "title": f"Budget & Luxury Hotels in {city}",
+            "discount": "Instant Bank Offers",
+            "url": f"https://www.makemytrip.com/hotels/{requests.utils.quote(city.lower())}-hotels.html",
+            "badge": "Popular in India",
+            "color": "#e41d25"
+        },
+        {
+            "partner": "Agoda",
+            "title": f"Secret Flash Deals on Resorts in {city}",
+            "discount": "Special Mobile Rates",
+            "url": f"https://www.agoda.com/search?city={requests.utils.quote(city)}",
+            "badge": "Verified Guest Reviews",
+            "color": "#5392f9"
+        }
+    ]
+    return jsonify({"city": city, "deals": deals})
 
 # ─── AUTHENTICATION API ROUTES ───────────────────────────────────
 

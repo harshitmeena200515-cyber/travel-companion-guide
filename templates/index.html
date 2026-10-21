@@ -211,6 +211,79 @@
             </div>
         </div>
 
+        <!-- 🏨 Hotel Deals Section (Affiliate Income Engine) -->
+        <div class="glass-panel" style="grid-column: 1 / -1; margin-top: 1.5rem; margin-bottom: 1.5rem; padding: 24px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12);" id="hotelDealsSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 1.5rem; color: #38bdf8; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-hotel"></i> Exclusive Hotel & Stay Deals
+                </h3>
+                <span style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                    Verified Best Prices
+                </span>
+            </div>
+            <div id="hotelDealsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <!-- Dynamically populated via script.js -->
+            </div>
+        </div>
+
+        <!-- ✨ AI Trip Planner (Google AI Studio Gemini Engine) -->
+        <div class="glass-panel" style="grid-column: 1 / -1; margin-top: 1.5rem; margin-bottom: 2rem; padding: 28px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); background: rgba(15, 23, 42, 0.85);" id="aiPlannerContainer">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                <div>
+                    <h3 style="font-size: 1.8rem; color: #818cf8; display: flex; align-items: center; gap: 12px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Smart Trip Planner
+                    </h3>
+                    <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 4px;">Powered by Google AI Studio (Gemini 3.8 Flash) • डे-बाय-डे ट्रिप प्लान, बजट व फूड गाइड</p>
+                </div>
+                <button id="printPlanBtn" onclick="printItinerary()" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">
+                    <i class="fa-solid fa-print"></i> Print / Save PDF
+                </button>
+            </div>
+
+            <!-- Planner Form Options -->
+            <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; align-items: center;">
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Duration</label>
+                    <select id="aiDaysSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                        <option value="1">1 Day Express Tour</option>
+                        <option value="2">2 Days Weekend Trip</option>
+                        <option value="3" selected>3 Days Full Tour</option>
+                        <option value="5">5 Days Grand Vacation</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Budget Category</label>
+                    <select id="aiBudgetSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                        <option value="Budget Student (₹)">Budget / Student Friendly (₹)</option>
+                        <option value="Moderate (₹₹)" selected>Comfortable / Moderate (₹₹)</option>
+                        <option value="Luxury (₹₹₹)">Luxury Experience (₹₹₹)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Travel Group</label>
+                    <select id="aiGroupSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                        <option value="Solo Explorer">Solo Explorer</option>
+                        <option value="Friends Group" selected>Friends Group</option>
+                        <option value="Family with Kids">Family</option>
+                        <option value="Couples Trip">Couples</option>
+                    </select>
+                </div>
+                <div style="align-self: flex-end;">
+                    <button id="generateAiPlanBtn" onclick="generateAiPlan()" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; border: none; padding: 10px 22px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); transition: transform 0.2s;">
+                        <i class="fa-solid fa-sparkles"></i> Generate Itinerary with Gemini
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Output Result Box -->
+            <div id="aiPlanLoading" style="display: none; padding: 30px; text-align: center; color: #818cf8;">
+                <div class="spinner" style="margin: 0 auto 12px;"></div>
+                <p>Google AI Studio (Gemini 3.8 Flash) आपके लिए सबसे बेहतरीन ट्रिप प्लान और सीक्रेट फूड स्पॉट्स तैयार कर रहा है...</p>
+            </div>
+            <div id="aiPlanResult" style="display: none; background: rgba(2, 6, 23, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 24px; color: #f1f5f9; line-height: 1.8; white-space: pre-wrap; font-family: inherit;">
+            </div>
+        </div>
+
         <!-- Places Section -->
         <div class="places-section">
             <h3><span id="placesCityName"></span> - All Famous Locations</h3>
