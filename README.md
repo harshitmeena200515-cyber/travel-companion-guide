@@ -3,10 +3,10 @@
 [![Python Version](https://img.shields.io/badge/Python-3.8+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Framework-Flask-000000.svg?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
-[![Gemini](https://img.shields.io/badge/AI-Gemini%203.8%20Flash-4285F4.svg?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
+[![AI Studio](https://img.shields.io/badge/AI-AI%20Studio%20Engine-4285F4.svg?style=for-the-badge&logoColor=white)](https://aistudio.google.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](#)
 
-**Travele** is an interactive, intelligent web application designed to help travelers search, discover, and plan their journeys across world cities and tourist destinations. It aggregates live weather forecasts, seasonal trip recommendations, popular historical landmarks, Wikipedia city insights, and real-time itinerary generation powered by **Google Gemini 3.8 Flash AI**.
+**Travele** is an interactive, intelligent web application designed to help travelers search, discover, and plan their journeys across world cities and tourist destinations. It aggregates live weather forecasts, seasonal trip recommendations, popular historical landmarks, Wikipedia city insights, and real-time itinerary generation powered by **AI Studio Neural Engine**.
 
 ---
 
@@ -16,7 +16,7 @@
 - 🌤️ **Live Weather Updates**: Live temperature, weather condition code, wind speeds, and relative humidity for any global city.
 - 🏛️ **Top Attractions & Landmark Discovery**: Automatically retrieves top monuments, museums, parks, and viewpoints using Wikipedia API with image previews and summaries.
 - ☀️ ❄️ 🌧️ **Seasonal Categorization**: Categorizes places into Summer, Winter, and Monsoon recommendations based on landmark characteristics.
-- 🤖 **Gemini AI Travel Planner**: Custom day-by-day itineraries and travel advisory generated in real time.
+- 🤖 **Smart AI Travel Planner**: Custom day-by-day itineraries and travel advisory generated in real time.
 - 🌐 **Country & Currency Details**: Retrieves official currencies, languages, timezones, and national flags via RestCountries API.
 - 🎙️ **Voice Search**: Hands-free voice recognition support for destination lookups.
 - 📱 **Fully Responsive UI**: Modern glassmorphic interface designed for seamless mobile and desktop browsing.
@@ -27,7 +27,7 @@
 ## 🛠️ Tech Stack
 
 - **Backend**: Python 3.10+, Flask, SQLite
-- **AI Engine**: Google AI Studio (Gemini 3.8 Flash)
+- **AI Engine**: AI Studio Neural Engine
 - **Frontend**: HTML5, Modern CSS3 (Glassmorphism), JavaScript (ES6+ Fetch API, Web Speech API)
 - **External Data APIs**:
   - [Open-Meteo API](https://open-meteo.com/) (Geocoding & Forecast)
@@ -96,7 +96,7 @@ Open your browser and navigate to `http://localhost:5000`.
 This repository is pre-configured with `vercel.json` for serverless deployment:
 1. Import the repository `travel-companion-guide` on [Vercel](https://vercel.com/new).
 2. Set the framework preset to **Other** (Vercel automatically detects `vercel.json` and Python runtime).
-3. (Optional) Add your `GEMINI_API_KEY` under Environment Variables in the Vercel project settings.
+3. (Optional) Add your `AI_API_KEY` under Environment Variables in the Vercel project settings.
 4. Click **Deploy**.
 
 ---

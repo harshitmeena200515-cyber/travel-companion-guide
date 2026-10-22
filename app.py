@@ -27,21 +27,22 @@ WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 # Wikipedia API
 WIKI_URL = "https://en.wikipedia.org/w/api.php"
 
-def get_gemini_key():
-    key = os.getenv("GEMINI_API_KEY")
+def get_ai_key():
+    key = os.getenv("AI_API_KEY") or os.getenv("AI_STUDIO_KEY")
     if not key:
         env_file = os.path.join(os.path.dirname(__file__), ".env")
         if os.path.exists(env_file):
             with open(env_file, encoding='utf-8') as f:
                 for line in f:
-                    if line.startswith("GEMINI_API_KEY="):
+                    if line.startswith("AI_API_KEY=") or line.startswith("AI_STUDIO_KEY="):
                         key = line.strip().split("=", 1)[1]
+                        break
     return key
 
-def call_gemini(prompt, system_instruction=None):
-    key = get_gemini_key()
+def call_ai_engine(prompt, system_instruction=None):
+    key = get_ai_key()
     if not key:
-        return "⚠️ Google AI Studio GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your environment or .env file."
+        return "⚠️ AI Studio API Key is not configured. Please set AI_API_KEY in your environment or .env file."
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={key}"
     payload = {
@@ -105,7 +106,7 @@ def index():
 def admin_page():
     return render_template('admin.html')
 
-# ─── GOOGLE AI STUDIO (GEMINI) ENDPOINTS ─────────────────────────
+# ─── AI STUDIO NEURAL ENGINE ENDPOINTS ─────────────────────────
 
 @app.route('/api/ai/plan', methods=['POST'])
 def ai_plan():
@@ -136,7 +137,7 @@ def ai_plan():
     """
     system_instruction = "You are an elite travel architect and local cultural connoisseur with deep knowledge of Indian and global travel logistics, budgets, safety, and cuisine."
     
-    plan_text = call_gemini(prompt, system_instruction)
+    plan_text = call_ai_engine(prompt, system_instruction)
     return jsonify({
         "city": city,
         "days": days,
@@ -153,7 +154,7 @@ def ai_ask():
         return jsonify({"error": "Question is required"}), 400
 
     prompt = f"Regarding traveling to or exploring {city}: {question}. Provide an accurate, helpful, friendly answer with practical tips."
-    reply = call_gemini(prompt, "You are Travele's instant AI travel assistant. Answer helpfully, accurately, and concisely.")
+    reply = call_ai_engine(prompt, "You are Travele's instant AI travel assistant. Answer helpfully, accurately, and concisely.")
     return jsonify({"reply": reply})
 
 @app.route('/api/hotels/affiliates', methods=['GET'])
