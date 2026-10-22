@@ -7,7 +7,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "travele-secure-secret-key-harshit-2026")
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "travele_auth.db")
+if os.environ.get("VERCEL"):
+    import shutil
+    tmp_db = "/tmp/travele_auth.db"
+    orig_db = os.path.join(os.path.dirname(__file__), "travele_auth.db")
+    if not os.path.exists(tmp_db) and os.path.exists(orig_db):
+        try:
+            shutil.copy2(orig_db, tmp_db)
+        except Exception:
+            pass
+    DB_PATH = tmp_db
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "travele_auth.db")
 
 # Open-Meteo Geocoding API
 GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
