@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Travele — Smart Travel Companion & AI Destination Explorer</title>
+    <title>Weather & City Explorer</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -73,7 +73,7 @@
                 if (res.ok) {
                     window.location.href = data.redirect || 'admin.html';
                 } else {
-                    err.textContent = data.error || 'Invalid credentials (Use admin / HarshitTravelAdmin2026!)';
+                    err.textContent = data.error || 'Login failed';
                     err.style.display = 'block';
                 }
             } catch (ex) {
@@ -97,12 +97,9 @@
                 const params = parsedUrl.searchParams;
 
                 try {
-                    // Try real backend first if running locally
                     const realRes = await originalFetch(url, options);
                     if (realRes.ok || realRes.status !== 404) return realRes;
-                } catch (e) {
-                    // Fallback to client-side serverless execution
-                }
+                } catch (e) {}
 
                 // 1. Suggest / Geocoding
                 if (path === '/api/suggest') {
@@ -137,7 +134,7 @@
                         country_code: loc.country_code,
                         latitude: loc.latitude,
                         longitude: loc.longitude,
-                        temp: curr.temperature || 24,
+                        temp: curr.temperature !== undefined ? curr.temperature : 26,
                         weather_code: curr.weathercode || 0,
                         windspeed: curr.windspeed || 12,
                         winddirection: curr.winddirection || 180,
@@ -250,90 +247,155 @@ ${days > 2 ? `📅 Day 3: Leisure, Souvenirs & Relaxed Departure
         };
     </script>
 
-    <!-- Floating 3D Background Canvas -->
-    <div id="globeCanvasContainer" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; opacity: 0.35;"></div>
-
-    <div class="app-container">
-        <!-- Sidebar / Navigation -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fa-solid fa-compass fa-spin" style="--fa-animation-duration: 15s;"></i>
-                <h2>Travele</h2>
-            </div>
+    <!-- 3D Spinning Earth & Fullscreen Map Elements (Exact Match) -->
+    <div id="globeViz"></div>
+    <div id="fullScreenMapContainer">
+        <button id="closeMapBtn" class="close-btn"><i class="fa-solid fa-xmark"></i> Back to Earth</button>
+        <iframe id="fullScreenMap" width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"></iframe>
+    </div>
+    <div class="background-overlay"></div>
+    
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-earth-americas"></i> City Explorer</h1>
+            <p>Discover weather and beautiful locations</p>
             
-            <nav class="nav-links">
-                <a href="#dashboard" class="nav-item active"><i class="fa-solid fa-house"></i> Dashboard</a>
-                <a href="#aiPlannerContainer" class="nav-item"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Planner</a>
-                <a href="#placesSection" class="nav-item"><i class="fa-solid fa-map-location-dot"></i> Famous Places</a>
-                <a href="#hotelDealsSection" class="nav-item"><i class="fa-solid fa-hotel"></i> Hotel Deals</a>
-                <a href="admin.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Admin Portal</a>
-            </nav>
-
-            <div class="user-profile">
-                <div class="avatar"><i class="fa-solid fa-user"></i></div>
-                <div class="info">
-                    <span class="name">Harshit Meena</span>
-                    <span class="role">Explorer Pro</span>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="main-content" id="dashboard">
-            <!-- Search & Actions Topbar -->
-            <header class="topbar">
+            <div style="position: relative; max-width: 500px; margin: 0 auto;">
                 <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                    <input type="text" id="cityInput" placeholder="Search any city in the world (e.g. Jaipur, Tokyo, Paris)..." autocomplete="off">
-                    <button id="voiceBtn" title="Voice Search"><i class="fa-solid fa-microphone"></i></button>
-                    <div id="suggestionsBox" class="suggestions-dropdown"></div>
+                    <input type="text" id="cityInput" placeholder="Enter a city, state, or country..." autocomplete="off">
+                    <i id="micBtn" class="fa-solid fa-microphone" title="Search by Voice" style="cursor: pointer; font-size: 1.5rem; color: #cbd5e1; margin-right: 15px; align-self: center; transition: color 0.3s;"></i>
+                    <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
                 </div>
-
-                <div class="quick-chips">
-                    <button class="chip" onclick="searchCity('Jaipur')">Jaipur</button>
-                    <button class="chip" onclick="searchCity('Manali')">Manali</button>
-                    <button class="chip" onclick="searchCity('Goa')">Goa</button>
-                    <button class="chip" onclick="searchCity('Paris')">Paris</button>
-                    <button class="chip" onclick="searchCity('Dubai')">Dubai</button>
-                    <button class="chip" onclick="searchCity('Tokyo')">Tokyo</button>
+                <div id="autocompleteDropdown" class="glass-panel hidden" style="position: absolute; top: 100%; left: 0; width: 100%; margin-top: 5px; padding: 0; z-index: 100; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; text-align: left;">
+                    <!-- Suggestions will be injected here -->
                 </div>
-            </header>
+            </div>
+            <div id="loading" class="hidden">
+                <div class="spinner"></div>
+            </div>
+            <div id="errorMessage" class="error hidden"></div>
+        </header>
 
-            <!-- Dashboard Dynamic Grid -->
-            <div class="dashboard-grid">
-                <!-- Weather Widget Hero Card -->
-                <div class="glass-card weather-card" id="weatherCard">
-                    <div class="weather-header">
-                        <div>
-                            <h1 id="cityName" class="city-title">Jaipur</h1>
-                            <p id="countryName" class="country-sub">India <img id="countryFlag" src="" alt="Flag" style="width: 22px; vertical-align: middle; margin-left: 6px; border-radius: 4px; display: none;"></p>
+        <main id="mainContent" class="hidden">
+            <!-- Weather Section -->
+            <section class="glass-panel weather-panel">
+                <h2 id="cityName">City Name</h2>
+                <div class="weather-info">
+                    <div class="weather-main">
+                        <i id="weatherIcon" class="fa-solid fa-cloud-sun"></i>
+                        <span id="temperature">--°C</span>
+                    </div>
+                    <div class="weather-details">
+                        <div class="detail">
+                            <i class="fa-solid fa-droplet"></i>
+                            <span id="humidity">--%</span>
+                            <small>Humidity</small>
                         </div>
-                        <div class="weather-badge" id="weatherCondition">Sunny</div>
-                    </div>
-
-                    <div class="temp-display">
-                        <span id="tempValue" class="temp-num">28</span><span class="temp-unit">°C</span>
-                    </div>
-
-                    <div class="weather-metrics">
-                        <div class="metric"><i class="fa-solid fa-wind"></i> <span id="windSpeed">12 km/h</span></div>
-                        <div class="metric"><i class="fa-solid fa-droplet"></i> <span id="humidityVal">55%</span></div>
-                        <div class="metric"><i class="fa-solid fa-gauge"></i> <span id="pressureVal">1013 hPa</span></div>
+                        <div class="detail">
+                            <i class="fa-solid fa-wind"></i>
+                            <span id="windSpeed">-- km/h</span>
+                            <small>Wind</small>
+                        </div>
                     </div>
                 </div>
+            </section>
 
-                <!-- City Overview Card -->
-                <div class="glass-card city-overview-card">
-                    <h3><i class="fa-solid fa-circle-info"></i> Destination Insights</h3>
-                    <p id="cityExtract" class="city-extract">Loading rich insights and cultural highlights...</p>
-                    <div class="country-details" id="countryDetailsGrid">
-                        <!-- Injected via JS -->
+            <!-- Tourist Sections Container -->
+            <div class="tourist-dashboard">
+                <!-- Map Section -->
+                <section class="glass-panel tourist-panel map-panel">
+                    <h3><i class="fa-solid fa-map-location-dot"></i> City Map</h3>
+                    <iframe id="cityMap" width="100%" height="250" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src=""></iframe>
+                </section>
+
+                <!-- Travel Essentials -->
+                <section class="glass-panel tourist-panel essentials-panel">
+                    <h3><i class="fa-solid fa-passport"></i> Travel Essentials</h3>
+                    <div class="essentials-grid">
+                        <div class="essential-item">
+                            <i class="fa-solid fa-money-bill-wave"></i>
+                            <div>
+                                <small>Currency</small>
+                                <p id="countryCurrency">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="essential-item">
+                            <i class="fa-solid fa-language"></i>
+                            <div>
+                                <small>Languages</small>
+                                <p id="countryLanguages">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="essential-item">
+                            <i class="fa-solid fa-clock"></i>
+                            <div>
+                                <small>Local Time</small>
+                                <p id="localTime">Loading...</p>
+                            </div>
+                        </div>
                     </div>
+                </section>
+
+                <!-- Smart Packing -->
+                <section class="glass-panel tourist-panel packing-panel">
+                    <h3><i class="fa-solid fa-suitcase"></i> Smart Packing Tips</h3>
+                    <ul id="packingList" class="packing-list">
+                        <li>Loading tips...</li>
+                    </ul>
+                </section>
+
+                <!-- Trip Planner Links -->
+                <section class="glass-panel tourist-panel planner-panel" style="grid-column: 1 / -1;">
+                    <h3><i class="fa-solid fa-plane-departure"></i> Plan Your Trip</h3>
+                    <div class="planner-links">
+                        <a id="linkFlights" href="#" target="_blank" class="planner-btn"><i class="fa-solid fa-plane"></i> Find Flights</a>
+                        <a id="linkHotels" href="#" target="_blank" class="planner-btn"><i class="fa-solid fa-bed"></i> Book Hotels</a>
+                        <a id="linkFood" href="#" target="_blank" class="planner-btn"><i class="fa-solid fa-utensils"></i> Restaurants</a>
+                        <a id="linkCabs" href="#" target="_blank" class="planner-btn"><i class="fa-solid fa-taxi"></i> Local Transport</a>
+                    </div>
+                </section>
+            </div>
+
+            <!-- History & About Section -->
+            <div id="overviewPanel" class="glass-panel hidden" style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 2rem;">
+                <img id="cityImage" src="" alt="City Image" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; margin-bottom: 1.5rem;" class="hidden">
+                <h2 id="overviewCityName" style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--accent);"></h2>
+                <p id="cityDescription" style="font-size: 1.1rem; line-height: 1.8; color: #cbd5e1; text-align: justify; max-width: 900px; margin: 0 auto;"></p>
+            </div>
+
+            <div class="grid-layout">
+            </div>
+
+            <!-- Seasonal Guide Section -->
+            <div class="glass-panel" style="grid-column: 1 / -1; margin-top: 2rem; margin-bottom: 1rem;" id="seasonalGuideContainer">
+                <h3 style="font-size: 2rem; text-align: center; margin-bottom: 1.5rem; color: var(--primary);">Seasonal Travel Guide</h3>
+                <div class="tabs" style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 2rem;">
+                    <button class="tab-btn active" data-season="summer">☀️ Summer Places</button>
+                    <button class="tab-btn" data-season="monsoon">🌧️ Monsoon Places</button>
+                    <button class="tab-btn" data-season="winter">❄️ Winter Places</button>
+                </div>
+                <div id="seasonalGrid" class="places-grid" style="max-height: 500px; margin-bottom: 2rem;">
+                    <!-- Seasonal places will go here -->
                 </div>
             </div>
 
-            <!-- AI Trip Planner -->
-            <div class="glass-panel" style="margin-top: 1.5rem; margin-bottom: 2rem; padding: 28px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); background: rgba(15, 23, 42, 0.85);" id="aiPlannerContainer">
+            <!-- 🏨 Hotel Deals Section -->
+            <div class="glass-panel" style="grid-column: 1 / -1; margin-top: 1.5rem; margin-bottom: 1.5rem; padding: 24px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12);" id="hotelDealsSection">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                    <h3 style="font-size: 1.5rem; color: #38bdf8; display: flex; align-items: center; gap: 10px;">
+                        <i class="fa-solid fa-hotel"></i> Exclusive Hotel & Stay Deals
+                    </h3>
+                    <span style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                        Verified Best Prices
+                    </span>
+                </div>
+                <div id="hotelDealsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                    <!-- Dynamically populated via script.js -->
+                </div>
+            </div>
+
+            <!-- ✨ AI Trip Planner (AI Studio Neural Engine) -->
+            <div class="glass-panel" style="grid-column: 1 / -1; margin-top: 1.5rem; margin-bottom: 2rem; padding: 28px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); background: rgba(15, 23, 42, 0.85);" id="aiPlannerContainer">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
                     <div>
                         <h3 style="font-size: 1.8rem; color: #818cf8; display: flex; align-items: center; gap: 12px;">
@@ -381,6 +443,7 @@ ${days > 2 ? `📅 Day 3: Leisure, Souvenirs & Relaxed Departure
                     </div>
                 </div>
 
+                <!-- AI Output Result Box -->
                 <div id="aiPlanLoading" style="display: none; padding: 30px; text-align: center; color: #818cf8;">
                     <div class="spinner" style="margin: 0 auto 12px;"></div>
                     <p>AI Studio Neural Engine आपके लिए सबसे बेहतरीन ट्रिप प्लान और सीक्रेट फूड स्पॉट्स तैयार कर रहा है...</p>
@@ -389,19 +452,9 @@ ${days > 2 ? `📅 Day 3: Leisure, Souvenirs & Relaxed Departure
                 </div>
             </div>
 
-            <!-- Hotel Deals Section -->
-            <div id="hotelDealsSection" class="glass-panel" style="margin-bottom: 2rem; padding: 24px; border-radius: 20px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08);">
-                <h3 style="font-size: 1.4rem; color: #38bdf8; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-hotel"></i> Handpicked Hotel & Stay Deals
-                </h3>
-                <div id="hotelDealsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
-                    <!-- Injected via script.js -->
-                </div>
-            </div>
-
             <!-- Places Section -->
-            <div class="places-section" id="placesSection">
-                <h3><span id="placesCityName">Jaipur</span> — Top Tourist Attractions & Landmarks</h3>
+            <div class="places-section">
+                <h3><span id="placesCityName"></span> - All Famous Locations</h3>
                 <div id="placesGrid" class="places-grid">
                     <!-- Cards will be injected here via JS -->
                 </div>
