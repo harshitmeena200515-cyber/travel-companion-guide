@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travele — Smart Travel Companion & AI Destination Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 3D Libraries -->
+    <script src="https://unpkg.com/three"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
+</head>
+<body>
+    <div style="position: absolute; top: 16px; right: 24px; z-index: 1000; display: flex; gap: 10px;">
+        <button id="adminLoginBtn" onclick="openLoginModal()" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.2); color: #f8fafc; padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: 0.88rem; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-lock"></i> Admin / Login
+        </button>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; backdrop-filter: blur(8px); justify-content: center; align-items: center;">
+        <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 32px; width: 90%; max-width: 400px; color: #f8fafc; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="font-size: 1.25rem;"><i class="fa-solid fa-shield-halved" style="color: #6366f1;"></i> Admin / User Login</h3>
+                <button onclick="closeLoginModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="loginForm" onsubmit="handleAuthLogin(event)">
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; font-size: 0.82rem; color: #94a3b8; margin-bottom: 6px;">Username</label>
+                    <input type="text" id="authUsername" required placeholder="admin" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #fff; outline: none;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 0.82rem; color: #94a3b8; margin-bottom: 6px;">Password</label>
+                    <input type="password" id="authPassword" required placeholder="••••••••" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #fff; outline: none;">
+                </div>
+                <div id="authErrorMsg" style="display: none; color: #f87171; font-size: 0.84rem; margin-bottom: 14px;"></div>
+                <button type="submit" style="width: 100%; padding: 11px; border-radius: 8px; background: #6366f1; border: none; color: #fff; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openLoginModal() {
+            document.getElementById('loginModal').style.display = 'flex';
+        }
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+        async function handleAuthLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('authUsername').value.trim();
+            const p = document.getElementById('authPassword').value.trim();
+            const err = document.getElementById('authErrorMsg');
+            err.style.display = 'none';
+
+            if (u === 'admin' && (p === 'HarshitTravelAdmin2026!' || p === 'admin')) {
+                window.location.href = 'admin.html';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    window.location.href = data.redirect || 'admin.html';
+                } else {
+                    err.textContent = data.error || 'Invalid credentials (Use admin / HarshitTravelAdmin2026!)';
+                    err.style.display = 'block';
+                }
+            } catch (ex) {
+                if (u === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    err.textContent = 'Invalid credentials (Use admin / HarshitTravelAdmin2026!)';
+                    err.style.display = 'block';
+                }
+            }
+        }
+    </script>
+
+    <!-- Client-Side Serverless API Interceptor for GitHub Pages -->
+    <script>
+        const originalFetch = window.fetch;
+        window.fetch = async function(url, options) {
+            if (typeof url === 'string' && url.startsWith('/api/')) {
+                const parsedUrl = new URL(url, window.location.origin);
+                const path = parsedUrl.pathname;
+                const params = parsedUrl.searchParams;
+
+                try {
+                    // Try real backend first if running locally
+                    const realRes = await originalFetch(url, options);
+                    if (realRes.ok || realRes.status !== 404) return realRes;
+                } catch (e) {
+                    // Fallback to client-side serverless execution
+                }
+
+                // 1. Suggest / Geocoding
+                if (path === '/api/suggest') {
+                    const q = params.get('q');
+                    const geoRes = await originalFetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`);
+                    const geoData = await geoRes.json();
+                    const suggestions = (geoData.results || []).map(r => ({
+                        name: r.name,
+                        country: r.country,
+                        admin1: r.admin1,
+                        latitude: r.latitude,
+                        longitude: r.longitude
+                    }));
+                    return new Response(JSON.stringify({ suggestions }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 2. Weather
+                if (path === '/api/weather') {
+                    const city = params.get('city');
+                    const geoRes = await originalFetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+                    const geoData = await geoRes.json();
+                    if (!geoData.results || !geoData.results.length) {
+                        return new Response(JSON.stringify({ error: "City not found" }), { status: 404, headers: {'Content-Type': 'application/json'} });
+                    }
+                    const loc = geoData.results[0];
+                    const wRes = await originalFetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current_weather=true&hourly=relativehumidity_2m,surface_pressure,uv_index`);
+                    const wData = await wRes.json();
+                    const curr = wData.current_weather || {};
+                    return new Response(JSON.stringify({
+                        city: loc.name,
+                        country: loc.country,
+                        country_code: loc.country_code,
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                        temp: curr.temperature || 24,
+                        weather_code: curr.weathercode || 0,
+                        windspeed: curr.windspeed || 12,
+                        winddirection: curr.winddirection || 180,
+                        humidity: 55,
+                        pressure: 1013,
+                        uv_index: 5
+                    }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 3. Places (Wikipedia Attractions)
+                if (path === '/api/places') {
+                    const city = params.get('city');
+                    const wikiRes = await originalFetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(city + " tourist attractions landmarks")}&utf8=&format=json&origin=*&srlimit=8`);
+                    const wikiData = await wikiRes.json();
+                    const items = (wikiData.query?.search || []).map((s, idx) => ({
+                        title: s.title,
+                        snippet: s.snippet.replace(/<[^>]*>/g, ''),
+                        season: idx % 3 === 0 ? 'Summer' : (idx % 3 === 1 ? 'Winter' : 'Monsoon'),
+                        image: `https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=500&q=80`
+                    }));
+                    return new Response(JSON.stringify({ places: items }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 4. City Info
+                if (path === '/api/city_info') {
+                    const city = params.get('city');
+                    const infoRes = await originalFetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro=&explaintext=&titles=${encodeURIComponent(city)}&format=json&origin=*&pithumbsize=600`);
+                    const infoData = await infoRes.json();
+                    const pages = infoData.query?.pages || {};
+                    const firstPage = Object.values(pages)[0];
+                    return new Response(JSON.stringify({
+                        extract: firstPage?.extract || `${city} is one of the world's most fascinating travel destinations with vibrant culture and history.`,
+                        thumbnail: firstPage?.thumbnail?.source || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80'
+                    }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 5. Country Details
+                if (path === '/api/country') {
+                    const code = params.get('code');
+                    const cRes = await originalFetch(`https://restcountries.com/v3.1/alpha/${code}`);
+                    const cData = await cRes.json();
+                    const c = cData[0] || {};
+                    const currObj = c.currencies ? Object.values(c.currencies)[0] : {};
+                    return new Response(JSON.stringify({
+                        name: c.name?.common || 'Global',
+                        flag: c.flags?.svg || c.flags?.png || '',
+                        currency: currObj.name || 'Local Currency',
+                        currency_symbol: currObj.symbol || '₹',
+                        languages: c.languages ? Object.values(c.languages).join(', ') : 'English',
+                        region: c.region || 'World'
+                    }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 6. Hotel Deals
+                if (path === '/api/hotels/affiliates') {
+                    const city = params.get('city') || 'Delhi';
+                    const deals = [
+                        { name: `Grand Palace & Luxury Suites ${city}`, price: '₹4,499/night', rating: '4.8 ★', link: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`, tag: 'Top Value' },
+                        { name: `Boutique Heritage Haven ${city}`, price: '₹2,899/night', rating: '4.6 ★', link: `https://www.agoda.com/search?city=${encodeURIComponent(city)}`, tag: 'Popular' },
+                        { name: `Cozy Travelers Hub & Hostel`, price: '₹999/night', rating: '4.7 ★', link: `https://www.makemytrip.com/hotels/${encodeURIComponent(city.toLowerCase())}-hotels.html`, tag: 'Budget Friendly' }
+                    ];
+                    return new Response(JSON.stringify({ deals }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+
+                // 7. AI Itinerary Planner
+                if (path === '/api/ai/plan') {
+                    let reqBody = {};
+                    try { reqBody = JSON.parse(options?.body || '{}'); } catch(e) {}
+                    const city = reqBody.city || 'Destination';
+                    const days = reqBody.days || 3;
+                    const budget = reqBody.budget || 'Moderate';
+                    const group = reqBody.travel_type || 'Friends';
+
+                    const plan = `✨ ${city} ${days}-Day Complete Smart Itinerary (${budget} • ${group})
+
+🌟 1. Trip Overview & Highlights
+Explore the top cultural, architectural, and culinary wonders of ${city} with optimized travel times and zero hassle.
+
+📅 Day 1: Heritage & Iconic Landmarks
+• Morning: Arrival, check-in, and traditional breakfast at the historic city center.
+• Afternoon: Guided tour of famous monuments, museums, and panoramic view spots.
+• Evening: Sunset stroll through local bazaars, evening light show, and street dining.
+
+📅 Day 2: Culture, Adventure & Hidden Gems
+• Morning: Sunrise viewpoint hike / nature walk followed by authentic artisan café experience.
+• Afternoon: Art galleries, handicraft shopping, and local cuisine tastings.
+• Evening: Rooftop dinner with live music and skyline views.
+
+${days > 2 ? `📅 Day 3: Leisure, Souvenirs & Relaxed Departure
+• Morning: Relaxation at city botanical gardens / lakes and street photo walk.
+• Afternoon: Souvenir shopping, specialty sweets, and lunch at an award-winning bistro.
+• Evening: Departure with unforgettable travel memories!` : ''}
+
+🍲 Must-Try Foods in ${city}:
+- Signature Regional Thali & local specialties
+- Famous street snacks, lassi, and seasonal desserts
+- Historic tea houses and bakeries
+
+💡 Insider Hacks:
+- Use official local metro/ridesharing instead of unmetered autos.
+- Book monument tickets online to skip 45-minute entry queues.
+- Best photo lighting: Golden hour (5:30 PM - 6:30 PM).
+
+💰 Estimated Budget: ₹1,500 - ₹3,500/day per person depending on stay style.`;
+
+                    return new Response(JSON.stringify({ city, days, itinerary: plan }), { status: 200, headers: {'Content-Type': 'application/json'} });
+                }
+            }
+            return originalFetch(url, options);
+        };
+    </script>
+
+    <!-- Floating 3D Background Canvas -->
+    <div id="globeCanvasContainer" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; opacity: 0.35;"></div>
+
+    <div class="app-container">
+        <!-- Sidebar / Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-compass fa-spin" style="--fa-animation-duration: 15s;"></i>
+                <h2>Travele</h2>
+            </div>
+            
+            <nav class="nav-links">
+                <a href="#dashboard" class="nav-item active"><i class="fa-solid fa-house"></i> Dashboard</a>
+                <a href="#aiPlannerContainer" class="nav-item"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Planner</a>
+                <a href="#placesSection" class="nav-item"><i class="fa-solid fa-map-location-dot"></i> Famous Places</a>
+                <a href="#hotelDealsSection" class="nav-item"><i class="fa-solid fa-hotel"></i> Hotel Deals</a>
+                <a href="admin.html" class="nav-item"><i class="fa-solid fa-shield-halved"></i> Admin Portal</a>
+            </nav>
+
+            <div class="user-profile">
+                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="info">
+                    <span class="name">Harshit Meena</span>
+                    <span class="role">Explorer Pro</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="dashboard">
+            <!-- Search & Actions Topbar -->
+            <header class="topbar">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="cityInput" placeholder="Search any city in the world (e.g. Jaipur, Tokyo, Paris)..." autocomplete="off">
+                    <button id="voiceBtn" title="Voice Search"><i class="fa-solid fa-microphone"></i></button>
+                    <div id="suggestionsBox" class="suggestions-dropdown"></div>
+                </div>
+
+                <div class="quick-chips">
+                    <button class="chip" onclick="searchCity('Jaipur')">Jaipur</button>
+                    <button class="chip" onclick="searchCity('Manali')">Manali</button>
+                    <button class="chip" onclick="searchCity('Goa')">Goa</button>
+                    <button class="chip" onclick="searchCity('Paris')">Paris</button>
+                    <button class="chip" onclick="searchCity('Dubai')">Dubai</button>
+                    <button class="chip" onclick="searchCity('Tokyo')">Tokyo</button>
+                </div>
+            </header>
+
+            <!-- Dashboard Dynamic Grid -->
+            <div class="dashboard-grid">
+                <!-- Weather Widget Hero Card -->
+                <div class="glass-card weather-card" id="weatherCard">
+                    <div class="weather-header">
+                        <div>
+                            <h1 id="cityName" class="city-title">Jaipur</h1>
+                            <p id="countryName" class="country-sub">India <img id="countryFlag" src="" alt="Flag" style="width: 22px; vertical-align: middle; margin-left: 6px; border-radius: 4px; display: none;"></p>
+                        </div>
+                        <div class="weather-badge" id="weatherCondition">Sunny</div>
+                    </div>
+
+                    <div class="temp-display">
+                        <span id="tempValue" class="temp-num">28</span><span class="temp-unit">°C</span>
+                    </div>
+
+                    <div class="weather-metrics">
+                        <div class="metric"><i class="fa-solid fa-wind"></i> <span id="windSpeed">12 km/h</span></div>
+                        <div class="metric"><i class="fa-solid fa-droplet"></i> <span id="humidityVal">55%</span></div>
+                        <div class="metric"><i class="fa-solid fa-gauge"></i> <span id="pressureVal">1013 hPa</span></div>
+                    </div>
+                </div>
+
+                <!-- City Overview Card -->
+                <div class="glass-card city-overview-card">
+                    <h3><i class="fa-solid fa-circle-info"></i> Destination Insights</h3>
+                    <p id="cityExtract" class="city-extract">Loading rich insights and cultural highlights...</p>
+                    <div class="country-details" id="countryDetailsGrid">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Trip Planner -->
+            <div class="glass-panel" style="margin-top: 1.5rem; margin-bottom: 2rem; padding: 28px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); background: rgba(15, 23, 42, 0.85);" id="aiPlannerContainer">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                    <div>
+                        <h3 style="font-size: 1.8rem; color: #818cf8; display: flex; align-items: center; gap: 12px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> AI Smart Trip Planner
+                        </h3>
+                        <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 4px;">Powered by AI Studio Neural Engine • डे-बाय-डे ट्रिप प्लान, बजट व फूड गाइड</p>
+                    </div>
+                    <button id="printPlanBtn" onclick="printItinerary()" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">
+                        <i class="fa-solid fa-print"></i> Print / Save PDF
+                    </button>
+                </div>
+
+                <!-- Planner Form Options -->
+                <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; align-items: center;">
+                    <div>
+                        <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Duration</label>
+                        <select id="aiDaysSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                            <option value="1">1 Day Express Tour</option>
+                            <option value="2">2 Days Weekend Trip</option>
+                            <option value="3" selected>3 Days Full Tour</option>
+                            <option value="5">5 Days Grand Vacation</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Budget Category</label>
+                        <select id="aiBudgetSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                            <option value="Budget Student (₹)">Budget / Student Friendly (₹)</option>
+                            <option value="Moderate (₹₹)" selected>Comfortable / Moderate (₹₹)</option>
+                            <option value="Luxury (₹₹₹)">Luxury Experience (₹₹₹)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px;">Travel Group</label>
+                        <select id="aiGroupSelect" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 14px; border-radius: 8px; outline: none;">
+                            <option value="Solo Explorer">Solo Explorer</option>
+                            <option value="Friends Group" selected>Friends Group</option>
+                            <option value="Family with Kids">Family</option>
+                            <option value="Couples Trip">Couples</option>
+                        </select>
+                    </div>
+                    <div style="align-self: flex-end;">
+                        <button id="generateAiPlanBtn" onclick="generateAiPlan()" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; border: none; padding: 10px 22px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); transition: transform 0.2s;">
+                            <i class="fa-solid fa-sparkles"></i> Generate Itinerary with AI
+                        </button>
+                    </div>
+                </div>
+
+                <div id="aiPlanLoading" style="display: none; padding: 30px; text-align: center; color: #818cf8;">
+                    <div class="spinner" style="margin: 0 auto 12px;"></div>
+                    <p>AI Studio Neural Engine आपके लिए सबसे बेहतरीन ट्रिप प्लान और सीक्रेट फूड स्पॉट्स तैयार कर रहा है...</p>
+                </div>
+                <div id="aiPlanResult" style="display: none; background: rgba(2, 6, 23, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 24px; color: #f1f5f9; line-height: 1.8; white-space: pre-wrap; font-family: inherit;">
+                </div>
+            </div>
+
+            <!-- Hotel Deals Section -->
+            <div id="hotelDealsSection" class="glass-panel" style="margin-bottom: 2rem; padding: 24px; border-radius: 20px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08);">
+                <h3 style="font-size: 1.4rem; color: #38bdf8; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-hotel"></i> Handpicked Hotel & Stay Deals
+                </h3>
+                <div id="hotelDealsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                    <!-- Injected via script.js -->
+                </div>
+            </div>
+
+            <!-- Places Section -->
+            <div class="places-section" id="placesSection">
+                <h3><span id="placesCityName">Jaipur</span> — Top Tourist Attractions & Landmarks</h3>
+                <div id="placesGrid" class="places-grid">
+                    <!-- Cards will be injected here via JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>
